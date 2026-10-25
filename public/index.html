@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+  <title>Расписание Гнесинки</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --bg-page: #FAF8F5;
+      --card-bg: #FFFFFF;
+      --border-soft: #E8E5DF;
+      --text-main: #202421;
+      --text-muted: #666E64;
+      
+      /* Тёплый оливковый */
+      --olive-dark: #4A5734;
+      --olive-main: #5C6B43;
+      --olive-light: #EBF0E4;
+      --olive-border: #CBD6BE;
+      
+      /* Тёплый жёлтый / янтарный */
+      --yellow-main: #D97706;
+      --yellow-bright: #F59E0B;
+      --yellow-light: #FEF3C7;
+      --yellow-border: #FDE68A;
+      --yellow-text: #92400E;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Верхняя панель управления */
+    .top-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(250, 248, 245, 0.96);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 10px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-title h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .selectors-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    select.dept-select {
+      background: var(--card-bg);
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: var(--text-main);
+      outline: none;
+      font-weight: 500;
+      max-width: 200px;
+    }
+
+    .filters-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-pills {
+      display: inline-flex;
+      background: #EFECE6;
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .filter-pills .pill {
+      background: transparent;
+      border: none;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-pills .pill:hover {
+      color: var(--text-main);
+    }
+
+    .filter-pills .pill.active {
+      background: #FFFFFF;
+      color: var(--olive-dark);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Кнопка отправки в чат */
+    .btn-send-chat {
+      background: linear-gradient(135deg, var(--yellow-main), var(--yellow-bright));
+      color: #FFFFFF;
+      border: none;
+      border-radius: 9px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+      transition: all 0.2s ease;
+    }
+
+    .btn-send-chat:hover {
+      transform: translateY(-1px);
+    }
+
+    /* Кнопка скачивания PNG */
+    .btn-download {
+      background: linear-gradient(135deg, var(--olive-dark), var(--olive-main));
+      color: #FFFFFF;
+      border: none;
+      border-radius: 9px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(74, 87, 52, 0.25);
+      transition: all 0.2s ease;
+    }
+
+    .btn-download:hover {
+      transform: translateY(-1px);
+    }
+
+    /* Контейнер расписания для экспорта в PNG и удобного просмотра на мобильных */
+    .schedule-viewport {
+      flex: 1;
+      overflow-x: auto;
+      overflow-y: auto;
+      padding: 16px;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pan-y;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .schedule-canvas-wrap {
+      display: inline-block;
+      min-width: 100%;
+      transform-origin: top left;
+    }
+
+    #schedule-root {
+      background: #FAF8F5;
+      padding: 24px;
+      border-radius: 16px;
+      min-width: 1240px;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Шапка таблицы */
+    .schedule-header {
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .header-left h2 {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-main);
+    }
+
+    .header-left .school {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .group-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--yellow-light);
+      border: 1px solid var(--yellow-border);
+      color: var(--yellow-text);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    /* Сетка 6 дней (Пн-Сб) */
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .day-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Заголовок дня недели */
+    .day-header {
+      background: var(--card-bg);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .day-header .day-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .day-header::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 15%;
+      width: 70%;
+      height: 3px;
+      background: var(--yellow-bright);
+      border-radius: 2px;
+    }
+
+    /* Карточки пар */
+    .lesson-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      position: relative;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .lesson-card.group-lesson {
+      border-left: 4px solid var(--yellow-bright);
+    }
+
+    /* ЛИЧНЫЕ УРОКИ: оливковый акцент */
+    .lesson-card.personal-lesson {
+      background: #FDFAF5;
+      border: 1.5px solid var(--olive-border);
+      border-left: 5px solid var(--olive-dark);
+      box-shadow: 0 2px 8px rgba(74, 87, 52, 0.08);
+    }
+
+    /* Бейдж времени */
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      width: 100%;
+      background: var(--yellow-light);
+      border: 1px solid var(--yellow-border);
+      color: var(--yellow-text);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 6px;
+      border-radius: 5px;
+    }
+
+    .card-badge.personal {
+      background: var(--olive-light);
+      border: 1px solid var(--olive-border);
+      color: var(--olive-dark);
+    }
+
+    /* Название предмета (переносится, не обрезается!) */
+    .card-subject {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.35;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .lesson-card.personal-lesson .card-subject {
+      color: var(--olive-dark);
+    }
+
+    /* Преподаватель */
+    .card-teacher {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.3;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    /* Номер аудитории */
+    .card-room {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--olive-main);
+    }
+
+    /* Занятий нет */
+    .empty-day {
+      background: var(--card-bg);
+      border: 1px dashed var(--border-soft);
+      border-radius: 10px;
+      padding: 20px 8px;
+      text-align: center;
+      color: #9CA3AF;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* Модальное окно сохранения PNG для мобильных */
+    .image-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      padding: 16px;
+      overflow-y: auto;
+      text-align: center;
+    }
+
+    .image-modal.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-box {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 16px;
+      max-width: 95%;
+      margin: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .modal-box img {
+      max-width: 100%;
+      max-height: 65vh;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+    }
+
+    .modal-tip {
+      font-size: 13px;
+      color: var(--text-muted);
+      background: var(--yellow-light);
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: var(--yellow-text);
+      font-weight: 600;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-modal-close {
+      background: #E5E7EB;
+      color: #374151;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-modal-save {
+      background: var(--olive-main);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-modal-chat {
+      background: var(--yellow-main);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Загрузка */
+    .loading-spinner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border-soft);
+      border-top-color: var(--olive-main);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Верхняя панель -->
+  <header class="top-toolbar">
+    <div class="toolbar-left">
+      <div class="toolbar-title">
+        <h1>🎵 Гнесинка</h1>
+      </div>
+      <div class="selectors-row">
+        <select id="select-level" class="dept-select">
+          <option value="spo">🎓 СПО (Училище)</option>
+          <option value="bachelor">🏛 Бакалавриат</option>
+          <option value="specialist">🎭 Специалитет</option>
+          <option value="master">📜 Магистратура</option>
+        </select>
+        <select id="select-dept" class="dept-select"></select>
+        <select id="select-course" class="dept-select"></select>
+      </div>
+      <div class="filters-row">
+        <div class="filter-group">
+          <span class="filter-label">Форма:</span>
+          <div class="filter-pills" id="pills-funding">
+            <button class="pill active" data-val="all">Все</button>
+            <button class="pill" data-val="budget">Бюджет</button>
+            <button class="pill" data-val="contract">Платное</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Подгруппа:</span>
+          <div class="filter-pills" id="pills-subgroup">
+            <button class="pill active" data-val="all">Все</button>
+            <button class="pill" data-val="1">1 (А)</button>
+            <button class="pill" data-val="2">2 (Б)</button>
+            <button class="pill" data-val="3">3 (В)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn-send-chat" id="btn-send-chat">
+        <span>💬</span> Отправить в чат
+      </button>
+    </div>
+  </header>
+
+  <!-- Индикатор загрузки -->
+  <div id="loading" class="loading-spinner">
+    <div class="spinner"></div>
+    <div style="font-size: 14px; color: var(--text-muted);">Загружаем расписание...</div>
+  </div>
+
+  <!-- Область отображения расписания -->
+  <main class="schedule-viewport" id="viewport" style="display: none;">
+    <div class="schedule-canvas-wrap" id="canvas-wrap">
+      <div id="schedule-root">
+        
+        <!-- Шапка расписания -->
+        <div class="schedule-header">
+          <div class="header-left">
+            <h2>РАСПИСАНИЕ НА НЕДЕЛЮ</h2>
+            <div class="school" id="school-title">Музыкальное училище имени Гнесиных</div>
+          </div>
+          <div class="group-pill" id="badge-group-name">
+            Отделение и курс
+          </div>
+        </div>
+
+        <!-- 6 колонок дней -->
+        <div class="days-grid" id="days-container"></div>
+
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.disableVerticalSwipes) {
+        tg.disableVerticalSwipes();
+      }
+    }
+
+    let allSchedulesData = {};
+    let currentLevel = 'spo';
+    let currentDeptId = '01';
+    let currentCourseName = '1 курс';
+    let userPersonalLessons = [];
+    let cachedCanvas = null;
+    let currentFunding = 'all';
+    let currentSubgroup = 'all';
+
+    const EQUIV_MAP = {
+      '1': '1', 'а': '1', 'a': '1',
+      '2': '2', 'б': '2', 'b': '2',
+      '3': '3', 'в': '3', 'v': '3',
+      '4': '4', 'г': '4', 'g': '4',
+      '5': '5', '6': '6'
+    };
+
+    function matchesFilters(lesson, subgroup, funding) {
+      if (!lesson) return true;
+      const fullText = `${lesson.subject || ''} ${lesson.teacher || ''} ${lesson.room || ''}`.toLowerCase();
+
+      // 1. Фильтр финансирования
+      if (funding === 'budget') {
+        if (/платн|внебюдж/.test(fullText)) return false;
+      } else if (funding === 'contract') {
+        if (/бюдж/.test(fullText)) return false;
+      }
+
+      // 2. Фильтр подгруппы
+      if (subgroup && subgroup !== 'all') {
+        const target = EQUIV_MAP[String(subgroup).toLowerCase()] || String(subgroup);
+        const found = new Set();
+        const grpRegex = /(?:гр\.?|подгр\.?|п\/г|группа)\s*([0-9а-яa-z]+(?:\s*[,–-]\s*[0-9а-яa-z]+)*)/gi;
+        let m;
+        while ((m = grpRegex.exec(fullText)) !== null) {
+          const rawTokens = m[1].split(/[,–-\s]+/);
+          for (const r of rawTokens) {
+            const c = r.toLowerCase().trim();
+            if (EQUIV_MAP[c]) found.add(EQUIV_MAP[c]);
+          }
+        }
+        const parenRegex = /\((?:гр\.?\s*)?([1-6а-ва-вa-c])\)/gi;
+        while ((m = parenRegex.exec(fullText)) !== null) {
+          const c = m[1].toLowerCase().trim();
+          if (EQUIV_MAP[c]) found.add(EQUIV_MAP[c]);
+        }
+
+        if (found.size > 0 && !found.has(target)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function updatePillsUI(containerId, activeVal) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.querySelectorAll('.pill').forEach(btn => {
+        if (btn.dataset.val === (activeVal || 'all')) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    async function syncFiltersToServer() {
+      let userId = tg?.initDataUnsafe?.user?.id;
+      if (!userId) {
+        const params = new URLSearchParams(window.location.search);
+        userId = params.get('user_id') || params.get('userId');
+      }
+      if (!userId) return;
+
+      const payload = {
+        userId,
+        subgroup: currentSubgroup === 'all' ? null : currentSubgroup,
+        funding: currentFunding === 'all' ? null : currentFunding,
+      };
+
+      if (tg?.initData && tg?.Serverless?.call) {
+        try {
+          tg.Serverless.call('saveFilters', payload, () => {});
+        } catch (e) {}
+      } else {
+        try {
+          fetch('/api/saveFilters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Масштабирование расписания (жесты pinch-to-zoom двумя пальцами, double-tap и трекпад)
+    let currentScale = 1.0;
+    const viewport = document.getElementById('viewport');
+    const canvasWrap = document.getElementById('canvas-wrap');
+
+    function applyScale(scale) {
+      currentScale = Math.min(Math.max(scale, 0.4), 2.5);
+      canvasWrap.style.transform = `scale(${currentScale})`;
+      canvasWrap.style.transformOrigin = '0 0';
+
+      const root = document.getElementById('schedule-root');
+      if (root) {
+        const extraW = root.offsetWidth * (currentScale - 1);
+        const extraH = root.offsetHeight * (currentScale - 1);
+        canvasWrap.style.marginRight = extraW > 0 ? `${extraW}px` : '0px';
+        canvasWrap.style.marginBottom = extraH > 0 ? `${extraH}px` : '0px';
+      }
+    }
+
+    let isPinching = false;
+    let initialPinchDist = 0;
+    let initialPinchScale = 1.0;
+    let pinchCenterX = 0;
+    let pinchCenterY = 0;
+    let pinchContentX = 0;
+    let pinchContentY = 0;
+    let lastTapTime = 0;
+
+    viewport.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        isPinching = true;
+        canvasWrap.style.transition = 'none';
+        initialPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialPinchScale = currentScale;
+
+        const rect = viewport.getBoundingClientRect();
+        pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+
+        pinchContentX = (viewport.scrollLeft + pinchCenterX) / initialPinchScale;
+        pinchContentY = (viewport.scrollTop + pinchCenterY) / initialPinchScale;
+      }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length === 2) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        if (initialPinchDist > 0) {
+          const factor = dist / initialPinchDist;
+          const targetScale = Math.min(Math.max(initialPinchScale * factor, 0.4), 2.5);
+          applyScale(targetScale);
+
+          viewport.scrollLeft = pinchContentX * targetScale - pinchCenterX;
+          viewport.scrollTop = pinchContentY * targetScale - pinchCenterY;
+        }
+      }
+    }, { passive: false });
+
+    function endPinch() {
+      if (isPinching) {
+        isPinching = false;
+        initialPinchDist = 0;
+      }
+    }
+
+    viewport.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        endPinch();
+      }
+      // Быстрое двойное касание для приближения / возврата к исходному масштабу
+      if (e.changedTouches.length === 1 && !isPinching) {
+        const currentTime = Date.now();
+        const tapLength = currentTime - lastTapTime;
+        if (tapLength < 300 && tapLength > 60) {
+          canvasWrap.style.transition = 'transform 0.2s ease-out';
+          const touch = e.changedTouches[0];
+          const rect = viewport.getBoundingClientRect();
+          const tapX = touch.clientX - rect.left;
+          const tapY = touch.clientY - rect.top;
+
+          if (currentScale > 1.15) {
+            applyScale(1.0);
+          } else {
+            const targetScale = 1.5;
+            const contentX = (viewport.scrollLeft + tapX) / currentScale;
+            const contentY = (viewport.scrollTop + tapY) / currentScale;
+            applyScale(targetScale);
+            viewport.scrollLeft = contentX * targetScale - tapX;
+            viewport.scrollTop = contentY * targetScale - tapY;
+          }
+          setTimeout(() => {
+            canvasWrap.style.transition = 'none';
+          }, 220);
+          lastTapTime = 0;
+          return;
+        }
+        lastTapTime = currentTime;
+      }
+    });
+
+    viewport.addEventListener('touchcancel', endPinch);
+
+    // Поддержка жеста zoom на трекпаде для ПК (Cmd / Ctrl + жест щипка / колесико)
+    viewport.addEventListener('wheel', (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        canvasWrap.style.transition = 'none';
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const contentX = (viewport.scrollLeft + mouseX) / currentScale;
+        const contentY = (viewport.scrollTop + mouseY) / currentScale;
+
+        const zoomFactor = Math.exp(-e.deltaY * 0.01);
+        const targetScale = Math.min(Math.max(currentScale * zoomFactor, 0.4), 2.5);
+        applyScale(targetScale);
+
+        viewport.scrollLeft = contentX * targetScale - mouseX;
+        viewport.scrollTop = contentY * targetScale - mouseY;
+      }
+    }, { passive: false });
+
+    function timeToMinutes(t) {
+      if (!t) return 9999;
+      const m = t.match(/(\d{1,2}):(\d{2})/);
+      if (!m) return 9999;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // 1. Инициализация и надёжная загрузка данных
+    async function init() {
+      try {
+        const resp = await fetch('/data/schedules.json');
+        allSchedulesData = await resp.json();
+      } catch (err) {
+        console.error('Failed to load static schedules:', err);
+      }
+
+      // Пробуем получить персональные настройки и личные уроки студента из Telegram Serverless
+      await loadPersonalData();
+
+      const levelSelect = document.getElementById('select-level');
+      if (levelSelect) {
+        levelSelect.value = currentLevel;
+        levelSelect.addEventListener('change', (e) => {
+          currentLevel = e.target.value;
+          updateDeptSelector();
+          cachedCanvas = null;
+          render();
+        });
+      }
+
+      updateDeptSelector();
+
+      const deptSelect = document.getElementById('select-dept');
+      deptSelect.addEventListener('change', (e) => {
+        currentDeptId = e.target.value;
+        updateCourseSelector();
+        cachedCanvas = null;
+        render();
+      });
+
+      document.getElementById('select-course').addEventListener('change', (e) => {
+        currentCourseName = e.target.value;
+        cachedCanvas = null;
+        render();
+      });
+
+      // Переключатели фильтров
+      document.querySelectorAll('#pills-funding .pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#pills-funding .pill').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFunding = btn.dataset.val;
+          cachedCanvas = null;
+          render();
+          syncFiltersToServer();
+        });
+      });
+
+      document.querySelectorAll('#pills-subgroup .pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#pills-subgroup .pill').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentSubgroup = btn.dataset.val;
+          cachedCanvas = null;
+          render();
+          syncFiltersToServer();
+        });
+      });
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('viewport').style.display = 'block';
+      render();
+    }
+
+    function updateDeptSelector() {
+      const deptSelect = document.getElementById('select-dept');
+      deptSelect.innerHTML = '';
+
+      const depts = Object.entries(allSchedulesData).filter(
+        ([_, info]) => (info.level || 'spo') === currentLevel
+      );
+
+      depts.forEach(([dId, info]) => {
+        const opt = document.createElement('option');
+        opt.value = dId;
+        opt.innerText = info.dept_name;
+        deptSelect.appendChild(opt);
+      });
+
+      if (!allSchedulesData[currentDeptId] || (allSchedulesData[currentDeptId].level || 'spo') !== currentLevel) {
+        if (depts.length > 0) {
+          currentDeptId = depts[0][0];
+        }
+      }
+
+      deptSelect.value = currentDeptId;
+      updateCourseSelector();
+    }
+
+    function updateCourseSelector() {
+      const courseSelect = document.getElementById('select-course');
+      courseSelect.innerHTML = '';
+      const deptInfo = allSchedulesData[currentDeptId];
+      if (deptInfo && deptInfo.groups) {
+        deptInfo.groups.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g;
+          opt.innerText = g;
+          courseSelect.appendChild(opt);
+        });
+        if (deptInfo.groups.includes(currentCourseName)) {
+          courseSelect.value = currentCourseName;
+        } else {
+          currentCourseName = deptInfo.groups[0] || '1 курс';
+          courseSelect.value = currentCourseName;
+        }
+      }
+    }
+
+    // Загрузка личных уроков из backend
+    async function loadPersonalData() {
+      let userId = tg?.initDataUnsafe?.user?.id;
+      if (!userId) {
+        const params = new URLSearchParams(window.location.search);
+        userId = params.get('user_id') || params.get('userId');
+      }
+
+      if (tg?.initData && tg?.Serverless?.call) {
+        try {
+          await new Promise((resolve) => {
+            tg.Serverless.call('getSchedule', { userId }, (err, result) => {
+              if (!err && result && result.ok && result.found) {
+                applyUserData(result);
+              }
+              resolve();
+            });
+          });
+        } catch (e) {
+          console.warn('Serverless call skipped:', e);
+        }
+      } else if (userId) {
+        try {
+          const r = await fetch('/api/getSchedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          });
+          const res = await r.json();
+          if (res && res.ok && res.found) {
+            applyUserData(res);
+          }
+        } catch (e) {
+          // Игнорируем
+        }
+      }
+    }
+
+    function applyUserData(result) {
+      if (result.user) {
+        if (result.user.deptId) {
+          currentDeptId = result.user.deptId;
+          const info = allSchedulesData[currentDeptId];
+          if (info && info.level) {
+            currentLevel = info.level;
+            const lvlSelect = document.getElementById('select-level');
+            if (lvlSelect) lvlSelect.value = currentLevel;
+          }
+        }
+        if (result.user.groupName) currentCourseName = result.user.groupName;
+        if (result.user.subgroup) {
+          currentSubgroup = result.user.subgroup;
+          updatePillsUI('pills-subgroup', currentSubgroup);
+        }
+        if (result.user.funding) {
+          currentFunding = result.user.funding;
+          updatePillsUI('pills-funding', currentFunding);
+        }
+      }
+      if (result.personalLessons) {
+        userPersonalLessons = result.personalLessons;
+      }
+    }
+
+    // 2. Отрисовка расписания
+    function render() {
+      const deptInfo = allSchedulesData[currentDeptId] || {};
+      const deptName = deptInfo.dept_name || 'Отделение';
+      const schedule = deptInfo.schedule || {};
+      const courseSchedule = schedule[currentCourseName] || {};
+      const level = deptInfo.level || currentLevel || 'spo';
+
+      const schoolTitleMap = {
+        spo: 'Музыкальное училище имени Гнесиных (СПО)',
+        bachelor: 'Российская академия музыки имени Гнесиных (Бакалавриат)',
+        specialist: 'Российская академия музыки имени Гнесиных (Специалитет)',
+        master: 'Российская академия музыки имени Гнесиных (Магистратура)',
+      };
+      const schoolTitle = schoolTitleMap[level] || 'Российская академия музыки имени Гнесиных';
+      const schoolElem = document.getElementById('school-title');
+      if (schoolElem) schoolElem.innerText = schoolTitle;
+
+      let filterBadge = '';
+      if (currentFunding === 'budget') filterBadge += ' • Бюджет';
+      else if (currentFunding === 'contract') filterBadge += ' • Платное';
+
+      if (currentSubgroup && currentSubgroup !== 'all') {
+        const sgName = { '1': '1 (А)', '2': '2 (Б)', '3': '3 (В)' }[currentSubgroup] || currentSubgroup;
+        filterBadge += ` • гр. ${sgName}`;
+      }
+
+      const label = `${deptName} • ${currentCourseName}${filterBadge}`;
+      document.getElementById('badge-group-name').innerText = label;
+
+      const container = document.getElementById('days-container');
+      container.innerHTML = '';
+
+      DAYS_ORDER.forEach((dayName, dayIndex) => {
+        const col = document.createElement('div');
+        col.className = 'day-column';
+
+        // Шапка дня недели
+        const header = document.createElement('div');
+        header.className = 'day-header';
+        header.innerHTML = `<div class="day-name">${dayName}</div>`;
+        col.appendChild(header);
+
+        const allItems = [];
+
+        // 1. Общие пары группы (с учётом фильтров)
+        const groupItems = courseSchedule[dayName] || courseSchedule[dayName.toUpperCase()] || [];
+        groupItems.forEach((item, idx) => {
+          if (!matchesFilters(item, currentSubgroup, currentFunding)) return;
+          allItems.push({
+            isPersonal: false,
+            pairNum: idx + 1,
+            time: item.time || '',
+            subject: item.subject || '',
+            teacher: item.teacher || '',
+            room: item.room || '',
+          });
+        });
+
+        // 2. Личные уроки (СТРОГО для этого отделения и курса!)
+        const isoDay = dayIndex + 1;
+        const pItems = userPersonalLessons.filter(l => {
+          const dow = l.dayOfWeek ?? l.day_of_week;
+          const dId = l.deptId ?? l.dept_id;
+          const gName = l.groupName ?? l.group_name;
+          return dow === isoDay && dId === currentDeptId && gName === currentCourseName;
+        });
+
+        pItems.forEach(pl => {
+          const tStart = pl.timeStart || pl.time_start || '';
+          const tEnd = pl.timeEnd || pl.time_end || '';
+          const time = tEnd ? `${tStart}–${tEnd}` : tStart;
+          allItems.push({
+            isPersonal: true,
+            pairNum: null,
+            time: time,
+            subject: pl.subject || '',
+            teacher: pl.teacher || '',
+            room: pl.room || '',
+          });
+        });
+
+        // Сортировка по времени
+        allItems.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+
+        let currentPairNum = 1;
+        allItems.forEach(item => {
+          if (!item.isPersonal) {
+            item.pairNum = currentPairNum++;
+          }
+        });
+
+        if (allItems.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-day';
+          empty.innerText = 'Занятий нет 🎉';
+          col.appendChild(empty);
+        } else {
+          allItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = `lesson-card ${item.isPersonal ? 'personal-lesson' : 'group-lesson'}`;
+
+            const timeLabel = item.time || (item.isPersonal ? 'Время не указано' : 'Время уточняется');
+            const badgeText = item.isPersonal
+              ? `🎵 Личный урок • ${timeLabel}`
+              : `${timeLabel} • ${item.pairNum} пара`;
+
+            const badgeClass = item.isPersonal ? 'card-badge personal' : 'card-badge';
+
+            let teacher = (item.teacher || '').trim();
+            let room = (item.room || '').trim();
+            if (teacher && !room) {
+              const mRoom = teacher.match(/(?:кл\.|ауд\.|каб\.|[Кк]\.)\s*([0-9a-zA-Zа-яА-ЯёЁ\-_\./]+(?:\s*\([^\)]+\))?)/);
+              if (mRoom) {
+                room = mRoom[0].trim();
+                teacher = teacher.replace(mRoom[0], '').trim(' ,.-/');
+              }
+            }
+            if (room) {
+              room = room.replace(/^[Кк]\.\s*/, '');
+            }
+
+            card.innerHTML = `
+              <div class="${badgeClass}">
+                <span>${badgeText}</span>
+              </div>
+              <div class="card-subject">${escapeHtml(item.subject)}</div>
+              ${teacher ? `<div class="card-teacher">👤 ${escapeHtml(teacher)}</div>` : ''}
+              ${room ? `<div class="card-room">🏫 Ауд. ${escapeHtml(room)}</div>` : ''}
+            `;
+            col.appendChild(card);
+          });
+        }
+
+        container.appendChild(col);
+      });
+
+      applyScale(currentScale);
+    }
+
+    // 3. Генерация Canvas
+    async function captureScheduleCanvas() {
+      const root = document.getElementById('schedule-root');
+      const prevScale = currentScale;
+      applyScale(1.0);
+
+      const canvas = await html2canvas(root, {
+        scale: 2,
+        backgroundColor: '#FAF8F5',
+        useCORS: true,
+        logging: false,
+      });
+
+      applyScale(prevScale);
+      return canvas;
+    }
+
+    // 4. Отправка картинки в чат с ботом
+    async function sendImageToChat(canvas, triggerBtn = null, isSilentFail = false) {
+      const btn = triggerBtn || document.getElementById('btn-send-chat');
+      const oldText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.innerHTML = '⏳ Отправляю...';
+        btn.disabled = true;
+      }
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const deptInfo = allSchedulesData[currentDeptId] || {};
+      const label = `${deptInfo.dept_name || ''} • ${currentCourseName}`;
+      const userId = tg?.initDataUnsafe?.user?.id || new URLSearchParams(window.location.search).get('user_id');
+
+      const payload = {
+        image: dataUrl,
+        deptName: deptInfo.dept_name || '',
+        groupName: currentCourseName,
+        label,
+        userId,
+      };
+
+      function onSentSuccess() {
+        if (btn) btn.innerHTML = '✅ Отправлено в чат!';
+        const msg = 'Картинка расписания отправлена вам в чат с ботом! 📬';
+        if (tg?.showAlert) {
+          tg.showAlert(msg);
+        } else {
+          alert(msg);
+        }
+        setTimeout(() => {
+          if (btn) {
+            btn.innerHTML = oldText;
+            btn.disabled = false;
+          }
+        }, 2500);
+      }
+
+      function onSentFail(err) {
+        console.error('Failed to send image to chat:', err);
+        if (btn) {
+          btn.innerHTML = oldText;
+          btn.disabled = false;
+        }
+        if (!isSilentFail) {
+          const msg = err?.message || err?.description || 'Откройте приложение из диалога с ботом в Telegram.';
+          if (tg?.showAlert) {
+            tg.showAlert('Не удалось отправить в чат: ' + msg);
+          } else {
+            alert('Не удалось отправить в чат: ' + msg);
+          }
+        }
+      }
+
+      if (tg?.initData && tg?.Serverless?.call) {
+        try {
+          tg.Serverless.call('sendScheduleImage', payload, (err, res) => {
+            if (!err && res?.ok) onSentSuccess();
+            else onSentFail(err || res);
+          });
+          return;
+        } catch (e) {
+          console.warn('Serverless call failed, trying direct fetch:', e);
+        }
+      }
+
+      try {
+        const r = await fetch('/api/sendScheduleImage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const res = await r.json();
+        if (res?.ok) onSentSuccess();
+        else onSentFail(res);
+      } catch (err) {
+        onSentFail(err);
+      }
+    }
+
+    document.getElementById('btn-send-chat').addEventListener('click', async () => {
+      try {
+        const canvas = await captureScheduleCanvas();
+        await sendImageToChat(canvas, document.getElementById('btn-send-chat'));
+      } catch (e) {
+        alert('Ошибка генерации изображения: ' + e.message);
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

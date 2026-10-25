@@ -1,0 +1,11 @@
+{
+  "name": "gnes-project",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "npx @tgcloud/cli push",
+    "status": "npx @tgcloud/cli status",
+    "run": "npx @tgcloud/cli run",
+    "daemon": "node scripts/auto_schedule_daemon.js"
+  }
+}

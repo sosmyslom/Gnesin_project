@@ -1,0 +1,49 @@
+name: Update Schedule
+
+on:
+  schedule:
+    # Запуск каждый будний день в 04:00 UTC (07:00 МСК)
+    - cron: '0 4 * * 1-6'
+  workflow_dispatch: # Возможность запустить вручную одной кнопкой в GitHub Actions
+
+jobs:
+  update-schedule:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Schedule Update Pipeline
+        run: |
+          python scripts/update_pipeline.py
+
+      - name: Commit and push changes if updated
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add public/ tgcloud/lib/
+            git commit -m "Автоматическое обновление расписания [skip ci]"
+            git push
+          else
+            echo "Изменений в расписании нет."
+          fi
